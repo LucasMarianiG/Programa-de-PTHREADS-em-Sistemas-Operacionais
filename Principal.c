@@ -23,7 +23,12 @@
 #define SEED 42 
 // Máximo número aleatório a ser gerado
 #define MAX_NUM_ALEATORIO 30
-
+// Número de threads a serem criadas
+#define NUM_THREADS 4
+// Número de núcleos do processador
+#define NUM_NUCLEOS 10 
+// Número de núcleos lógicos do processador
+#define NUM_NUCLEOS_LOGICOS 16
 
 
 int** matriz;
@@ -36,13 +41,15 @@ int ehPrimo(int n);
 // Função que percorre a matriz de forma serial e conta os números primos
 void buscaSerial();
 
-void buscaParalelo();
+void buscaParalela(int);
 
 void criaMatriz();
 
 void preencheMatriz();
 
 void imprimeMatriz();
+
+void limpaMatriz();
 
 int main(int argc, char* argv[]) {
 	pthread_t thread;
@@ -58,6 +65,8 @@ int main(int argc, char* argv[]) {
 
 	buscaSerial();
 
+	buscaParalela(NUM_THREADS);
+
 	if (pthread_create(&thread, NULL, threadFunc, NULL) != 0) {
 		perror("Pthread_create falhou!");
 		exit(1);
@@ -67,9 +76,14 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	}
 	printf("Print do Main");
-	return 0;
-}
 
+	// Libera a memória alocada para a matriz
+	limpaMatriz();
+
+	return 0;
+	 
+}
+// estamos crianndo uma matriz dinamicamente
 void criaMatriz() {
 	matriz = malloc(MATRIZ_LINHAS * sizeof(int*)); // Alocando espaço para os ponteiros
 	int* dados = malloc(MATRIZ_LINHAS * MATRIZ_COLUNAS * sizeof(int)); // Alocando todos os elementos
@@ -130,6 +144,34 @@ void buscaSerial() {
 	printf("Tempo de execução (serial): %.2f segundos\n", tempo);
 }
 
+void buscaParalela() {
+	clock_t inicio = clock();
+	int totalPrimos = 0;
+	pthread_t threads[NUM_THREADS];
+	int thread_data[NUM_THREADS];
+
+	// Dividindo o trabalho entre as threads
+	for (int i = 0; i < NUM_THREADS; i++) {
+		thread_data[i] = i;
+		if (pthread_create(&threads[i], NULL, threadFunc, &thread_data[i]) != 0) {
+			perror("Pthread_create falhou!");
+			exit(1);
+		}
+	}
+	// Aguardando todas as threads terminarem
+	for (int i = 0; i < NUM_THREADS; i++) {
+		if (pthread_join(threads[i], NULL) != 0) {
+			perror("Pthread_join falhou!");
+			exit(1);
+		}
+	}
+	clock_t fim = clock();
+	double tempo = (double)(fim - inicio) / CLOCKS_PER_SEC;
+	printf("Busca Paralela: %d primos encontrados\n", totalPrimos);
+	printf("Tempo de execução (paralela): %.2f segundos\n", tempo);
+}
+	
+
 void* threadFunc(void* nenhum) {
 	printf("Print da Thread\n");
 }
@@ -143,3 +185,16 @@ void imprimeMatriz() {
 		printf("\n");
 	}
 }
+
+void limpaMatriz(){
+	if (matriz != NULL) {
+		// Libera o espaço alocado para os dados
+		free(matriz[0]); 
+		// Libera o espaço alocado para os ponteiros
+		free(matriz);
+		// para ter certeza que não vamos usar mais a matriz, vamos zerar o ponteiro
+		matriz = NULL; 
+	}
+
+}
+
